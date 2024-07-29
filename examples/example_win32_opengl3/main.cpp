@@ -40,7 +40,7 @@ int main(int, char**)
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEXW wc = { sizeof(wc), CS_OWNDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Dear ImGui Win32+OpenGL3 Example", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"ImGui Win32+OpenGL3 Example", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
 
     // Initialize OpenGL
     if (!CreateDeviceWGL(hwnd, &g_MainWindow))
@@ -173,7 +173,6 @@ int main(int, char**)
 
     return 0;
 }
-
 // Helper functions
 bool CreateDeviceWGL(HWND hWnd, WGL_WindowData* data)
 {
@@ -193,8 +192,35 @@ bool CreateDeviceWGL(HWND hWnd, WGL_WindowData* data)
     ::ReleaseDC(hWnd, hDc);
 
     data->hDC = ::GetDC(hWnd);
-    if (!g_hRC)
-        g_hRC = wglCreateContext(data->hDC);
+
+    {
+        #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+        #define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+        #define WGL_CONTEXT_PROFILE_MASK_ARB  0x9126
+        #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+
+        typedef HGLRC(WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShareContext, const int *attribList);
+        PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = nullptr;
+
+        HGLRC dummyContext = wglCreateContext(data->hDC);
+        wglMakeCurrent(data->hDC, dummyContext);
+
+        // Initialize the wglCreateContextAttribsARB function pointer
+        wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+        assert(wglCreateContextAttribsARB);
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(dummyContext);
+        assert(!g_hRC);
+         // Set the attributes for the OpenGL context
+        int attribs[] = {
+            WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+            WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+            WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+            0
+        };
+        g_hRC = wglCreateContextAttribsARB(data->hDC,nullptr,attribs);
+    }
+  
     return true;
 }
 
